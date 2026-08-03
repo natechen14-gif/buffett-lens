@@ -173,7 +173,15 @@ def render_company(bundle):
             with st.expander("展开完整公司介绍（英文原文）"):
                 st.write(bus)
     else:
-        st.write("暂无公司介绍数据。")
+        parts = [bundle["name"]]
+        if bundle.get("sector"):
+            parts.append(f"所属行业：{sector_cn(bundle['sector'])}")
+        if bundle.get("industry"):
+            parts.append(f"细分行业：{bundle['industry']}")
+        if bundle.get("market"):
+            parts.append(f"市场：{bundle['market']}")
+        st.write("，".join(parts) + "。")
+        st.caption("Yahoo 未收录该公司的详细简介，以上为基本信息。")
     meta = []
     if bundle.get("website"):
         meta.append(f"[官网]({bundle['website']})")
