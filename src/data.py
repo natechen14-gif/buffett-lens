@@ -141,7 +141,11 @@ def fetch_bundle(symbol):
         "name": info.get("longName") or info.get("shortName") or symbol,
         "sector": info.get("sector"),
         "industry": info.get("industry"),
-        "currency": info.get("currency") or "USD",
+        "currency": info.get("currency") or {
+            "沪市A股": "CNY",
+            "深市A股": "CNY",
+            "港股": "HKD",
+        }.get(detect_market(symbol), "USD"),
         "market": detect_market(symbol),
         "website": info.get("website"),
         "city": info.get("city"),
