@@ -7,7 +7,19 @@ from src import config as C
 st.set_page_config(page_title="Buffett Lens · 个股建仓判断", page_icon="🐂", layout="centered")
 
 st.title("🐂 巴菲特视角 · 个股建仓判断")
-st.caption("输入一个美股代码，立刻判断「现在能不能建仓」——质量门槛 + 安全边际 + 估值时机。")
+st.caption("输入美股 / A股 / 港股代码，立刻判断「现在能不能建仓」——质量门槛 + 安全边际 + 建议买入价 + 公司介绍。")
+
+SECTOR_CN = {
+    "Technology": "科技", "Consumer Defensive": "必需消费", "Consumer Cyclical": "可选消费",
+    "Healthcare": "医疗保健", "Financial Services": "金融", "Industrials": "工业",
+    "Energy": "能源", "Utilities": "公用事业", "Communication Services": "通信服务",
+    "Real Estate": "房地产", "Basic Materials": "基础材料",
+}
+
+
+def sector_cn(name):
+    return SECTOR_CN.get(name or "", name or "")
+
 
 QUOTES = {
     "green": "「用四毛钱的价格买进价值一块钱的东西。」",
@@ -22,14 +34,28 @@ def cached_fetch(symbol):
     return data.fetch_bundle(symbol)
 
 
-def fmt_money(x):
+CCY_SYM = {"USD": "$", "CNY": "¥", "HKD": "HK$", "TWD": "NT$"}
+
+
+def ccy_sym(ccy):
+    return CCY_SYM.get(ccy or "USD", (ccy or "USD") + " ")
+
+
+def fmt_money(x, ccy="USD"):
     if x is None:
         return "NA"
-    if x >= 1e9:
-        return f"${x / 1e9:.1f}B"
-    if x >= 1e6:
-        return f"${x / 1e6:.1f}M"
-    return f"${x:,.0f}"
+    s = ccy_sym(ccy)
+    if abs(x) >= 1e9:
+        return f"{s}{x / 1e9:.1f}B"
+    if abs(x) >= 1e6:
+        return f"{s}{x / 1e6:.1f}M"
+    return f"{s}{x:,.0f}"
+
+
+def fmt_price(x, ccy="USD"):
+    if x is None:
+        return "NA"
+    return f"{ccy_sym(ccy)}{x:,.2f}"
 
 
 def status_label(status):
@@ -95,18 +121,31 @@ def render_quality(q):
 def render_valuation(v, bundle):
     st.subheader("二、估值与买点时机（安全边际）")
     d = v.get("dcf") or {}
+    ccy = bundle["currency"] or "USD"
     cols = st.columns(3)
-    cols[0].metric("现价", fmt_money(bundle["current_price"]))
+    cols[0].metric("现价", fmt_price(bundle["current_price"], ccy))
     if d.get("iv_share"):
-        cols[1].metric("内在价值/股", fmt_money(d["iv_share"]))
+        cols[1].metric("内在价值/股", fmt_price(d["iv_share"], ccy))
         cols[2].metric("安全边际", f"{d['mos']:.1%}")
     else:
         cols[1].metric("内在价值/股", "NA")
         cols[2].metric("安全边际", "NA")
 
+    entry = v.get("entry") or {}
+    if entry.get("full"):
+        cur = bundle["current_price"]
+        if cur is not None and cur <= entry.get("good", 0):
+            zone = "✅ 当前价已低于更安全买点，处于非常低估区间"
+        elif cur is not None and cur <= entry["full"]:
+            zone = "✅ 当前价已进入建议建仓区间"
+        else:
+            zone = "⚠️ 当前价尚未进入建议建仓区间"
+        st.markdown(f"**建议建仓价格**：{fmt_price(entry['full'], ccy)}（安全边际 25%）"
+                    f"　｜　**更安全买点**：{fmt_price(entry['good'], ccy)}（安全边际 40%）　—　{zone}")
+
     info = []
     if d:
-        info.append(f"**DCF 模型**：FCF₀={fmt_money(d['fcf0'])}，前5年增速 g₁={d['g1']:.1%}，永续 g₂={C.PERPETUAL_GROWTH:.0%}，折现率 r={d['r']:.0%}")
+        info.append(f"**DCF 模型**：FCF₀={fmt_money(d['fcf0'], ccy)}，前5年增速 g₁={d['g1']:.1%}，永续 g₂={C.PERPETUAL_GROWTH:.0%}，折现率 r={d['r']:.0%}")
     ey = v.get("ey")
     if ey:
         info.append(f"**盈利收益率 vs 10年美债**：Earnings Yield={ey['ey']:.2%}，10Y={ey['tnx']:.2%}，利差={ey['spread']:+.2%}（利差<0 视为高估）")
@@ -125,8 +164,27 @@ def render_valuation(v, bundle):
         st.markdown(line)
 
 
+def render_company(bundle):
+    st.subheader("三、公司简介")
+    bus = bundle.get("long_business_summary")
+    if bus:
+        st.write(bus[:600] + ("…" if len(bus) > 600 else ""))
+        if len(bus) > 600:
+            with st.expander("展开完整公司介绍（英文原文）"):
+                st.write(bus)
+    else:
+        st.write("暂无公司介绍数据。")
+    meta = []
+    if bundle.get("website"):
+        meta.append(f"[官网]({bundle['website']})")
+    if bundle.get("city"):
+        meta.append(f"总部：{bundle['city']}{'，' + bundle['country'] if bundle.get('country') else ''}")
+    if meta:
+        st.caption(" · ".join(meta))
+
+
 def main():
-    sym = st.text_input("输入美股代码（如 AAPL）", "AAPL").strip().upper()
+    sym = st.text_input("输入股票代码（如 AAPL / 600519.SS / 0700.HK）", "AAPL").strip().upper()
     if st.button("判断现在能否建仓", type="primary"):
         if not sym:
             st.warning("请输入股票代码。")
@@ -148,13 +206,19 @@ def main():
 
         st.divider()
         st.markdown(f"### {bundle['name']}（{bundle['symbol']}）")
-        meta = bundle["sector"] or "未知行业"
-        st.caption(f"行业：{meta}")
+        meta_parts = [f"市场：{bundle['market']}", f"货币：{bundle['currency']}"]
+        if bundle.get("sector"):
+            meta_parts.append(f"行业：{sector_cn(bundle['sector'])}")
+        if bundle.get("industry"):
+            meta_parts.append(f"细分行业：{bundle['industry']}")
+        st.caption(" · ".join(meta_parts))
         render_verdict(d)
         st.divider()
         render_quality(q)
         st.divider()
         render_valuation(v, bundle)
+        st.divider()
+        render_company(bundle)
         st.divider()
         st.caption("数据来源：Yahoo Finance（yfinance）。本工具为巴菲特式定量参考，不构成投资建议；公司护城河、管理层等定性因素需另行判断。")
 

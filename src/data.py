@@ -49,6 +49,17 @@ def price_at_date(close, d):
     return float(close.iloc[pos])
 
 
+def detect_market(symbol):
+    s = symbol.upper()
+    if s.endswith(".SS"):
+        return "沪市A股"
+    if s.endswith(".SZ"):
+        return "深市A股"
+    if s.endswith(".HK"):
+        return "港股"
+    return "美股"
+
+
 def _safe_df(fn):
     try:
         df = fn()
@@ -129,6 +140,13 @@ def fetch_bundle(symbol):
         "symbol": symbol,
         "name": info.get("longName") or info.get("shortName") or symbol,
         "sector": info.get("sector"),
+        "industry": info.get("industry"),
+        "currency": info.get("currency") or "USD",
+        "market": detect_market(symbol),
+        "website": info.get("website"),
+        "city": info.get("city"),
+        "country": info.get("country"),
+        "long_business_summary": info.get("longBusinessSummary"),
         "quote_type": info.get("quoteType"),
         "current_price": current_price,
         "market_cap": info.get("marketCap"),

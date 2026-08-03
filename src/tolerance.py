@@ -16,7 +16,7 @@ def validate(bundle):
     has_price = bundle.get("current_price") is not None
     has_fin = any(bundle.get(k) for k in ("revenue", "net_income", "equity", "fcf"))
     if not has_price and (close is None or len(close) == 0) and not has_fin:
-        return False, "无法获取该代码的数据，请检查是否为美股代码（如 AAPL）。"
+        return False, "无法获取该代码的数据，请检查代码格式（如 AAPL / 600519.SS / 0700.HK）。"
     if not has_price:
         return False, "无法获取当前价格，请稍后重试。"
     return True, ""

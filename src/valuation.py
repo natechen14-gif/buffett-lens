@@ -55,6 +55,11 @@ def analyze_valuation(bundle, quality_score):
         mos = iv_share / price - 1
         result["dcf"] = {"iv_share": iv_share, "mos": mos, "fcf0": fcf0,
                          "g1": g1, "r": r, "net_cash": _net_cash(bundle)}
+        # 建议建仓价：内在价值折让 25%（充分安全边际）/ 40%（更安全买点）
+        result["entry"] = {
+            "full": iv_share / (1 + C.MOF["full"]),
+            "good": iv_share / (1 + 0.40),
+        }
 
     # ---- Earnings yield vs 10Y ----
     eps = bundle["trailing_eps"]
