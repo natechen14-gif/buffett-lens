@@ -4,6 +4,42 @@ import pandas as pd
 import yfinance as yf
 
 
+def normalize_symbol(symbol, market="auto"):
+    """把用户输入的裸代码规范成 yfinance 需要的代码。
+
+    market: auto | 美股 | 沪市A股 | 深市A股 | 港股
+    - 自动识别：纯数字 6 位且 6 开头 → 沪市A股；0/3 开头 → 深市A股；≤5 位 → 港股；其余按美股。
+    - 也兼容旧写法（600519.SS / 0700.HK），后缀会优先被识别，用户无需再手动加后缀。
+    """
+    s = str(symbol).strip().upper().replace(" ", "")
+    if not s:
+        return s
+    suffix_market = {"SS": "沪市A股", "SZ": "深市A股", "HK": "港股"}
+    for suf in suffix_market:
+        if s.endswith("." + suf):
+            s = s[:-3]
+            if market == "auto":
+                market = suffix_market[suf]
+            break
+    if market == "沪市A股":
+        return s + ".SS"
+    if market == "深市A股":
+        return s + ".SZ"
+    if market == "港股":
+        return s + ".HK"
+    if market == "美股":
+        return s
+    # 自动识别
+    if s.isdigit():
+        if len(s) == 6 and s.startswith("6"):
+            return s + ".SS"
+        if len(s) == 6 and s.startswith(("0", "3")):
+            return s + ".SZ"
+        if len(s) <= 5:
+            return s + ".HK"
+    return s
+
+
 def safe_get(df, aliases, col=0):
     if df is None or df.empty:
         return None
@@ -50,6 +86,7 @@ def price_at_date(close, d):
 
 
 def detect_market(symbol):
+    """根据（已规范化的）代码判断市场，用于币种等兜底。"""
     s = symbol.upper()
     if s.endswith(".SS"):
         return "沪市A股"

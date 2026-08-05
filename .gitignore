@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 .DS_Store
+.env
+美股分析交接_20260804.md

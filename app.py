@@ -1,31 +1,24 @@
 import streamlit as st
 import pandas as pd
 
-from src import data, decision, quality as qmod, tolerance as tol, valuation as vmod
+from src import data, decision, intro, quality as qmod, tolerance as tol, valuation as vmod
 from src import config as C
 
-st.set_page_config(page_title="Buffett Lens · 个股建仓判断", page_icon="🐂", layout="centered")
+st.set_page_config(page_title="贤哥视角 · 个股建仓判断", page_icon="🐂", layout="centered")
 
-st.title("🐂 巴菲特视角 · 个股建仓判断")
-st.caption("输入美股 / A股 / 港股代码，立刻判断「现在能不能建仓」——质量门槛 + 安全边际 + 建议买入价 + 公司介绍。")
-
-SECTOR_CN = {
-    "Technology": "科技", "Consumer Defensive": "必需消费", "Consumer Cyclical": "可选消费",
-    "Healthcare": "医疗保健", "Financial Services": "金融", "Industrials": "工业",
-    "Energy": "能源", "Utilities": "公用事业", "Communication Services": "通信服务",
-    "Real Estate": "房地产", "Basic Materials": "基础材料",
-}
+st.title("🐂 贤哥视角 · 个股建仓判断")
+st.caption("输入美股 / A股 / 港股代码（无需写后缀，自动识别），立刻判断「现在能不能建仓」——质量门槛 + 安全边际 + 建议买入价 + 中文公司简介。")
 
 
 def sector_cn(name):
-    return SECTOR_CN.get(name or "", name or "")
+    return intro.SECTOR_CN.get(name or "", name or "")
 
 
 QUOTES = {
-    "green": "「用四毛钱的价格买进价值一块钱的东西。」",
-    "yellow": "「价格是你付出的，价值是你得到的。」",
-    "red": "「以合理的价格买入一家伟大的公司，远胜于以低价买入一家平庸的公司。」",
-    "gray": "「宁要模糊的正确，不要精确的错误。」",
+    "green": "「好公司 + 好价格，才值得下手。」",
+    "yellow": "「没有安全边际，就不追。」",
+    "red": "「宁可错过，不可做错。」",
+    "gray": "「数据不足，不硬下结论。」",
 }
 
 
@@ -166,22 +159,16 @@ def render_valuation(v, bundle):
 
 def render_company(bundle):
     st.subheader("三、公司简介")
+    cn = intro.generate_chinese_intro(bundle)
+    st.write(cn["text"])
+    if cn["source"] == "deepseek":
+        st.caption("本段简介由 AI 根据公开资料生成，仅供参考。")
     bus = bundle.get("long_business_summary")
     if bus:
-        st.write(bus[:600] + ("…" if len(bus) > 600 else ""))
-        if len(bus) > 600:
-            with st.expander("展开完整公司介绍（英文原文）"):
-                st.write(bus)
+        with st.expander("英文原文（Yahoo Finance）"):
+            st.write(bus)
     else:
-        parts = [bundle["name"]]
-        if bundle.get("sector"):
-            parts.append(f"所属行业：{sector_cn(bundle['sector'])}")
-        if bundle.get("industry"):
-            parts.append(f"细分行业：{bundle['industry']}")
-        if bundle.get("market"):
-            parts.append(f"市场：{bundle['market']}")
-        st.write("，".join(parts) + "。")
-        st.caption("Yahoo 未收录该公司的详细简介，以上为基本信息。")
+        st.caption("Yahoo 未收录该公司的详细英文简介，以上为结构化中文信息。")
     meta = []
     if bundle.get("website"):
         meta.append(f"[官网]({bundle['website']})")
@@ -192,14 +179,19 @@ def render_company(bundle):
 
 
 def main():
-    sym = st.text_input("输入股票代码（如 AAPL / 600519.SS / 0700.HK）", "AAPL").strip().upper()
+    col_in, col_mk = st.columns([3, 1])
+    with col_in:
+        sym = st.text_input("输入股票代码（美股如 AAPL；A股如 600519、000858；港股如 0700）", "AAPL").strip()
+    with col_mk:
+        market = st.selectbox("市场", ["自动识别", "美股", "沪市A股", "深市A股", "港股"], index=0)
     if st.button("判断现在能否建仓", type="primary"):
-        if not sym:
+        norm = data.normalize_symbol(sym, market)
+        if not norm:
             st.warning("请输入股票代码。")
             return
         try:
             with st.spinner("正在抓取财务数据（约几秒）…"):
-                bundle = cached_fetch(sym)
+                bundle = cached_fetch(norm)
         except Exception as e:
             st.error(f"抓取失败：{e}")
             return
@@ -228,7 +220,7 @@ def main():
         st.divider()
         render_company(bundle)
         st.divider()
-        st.caption("数据来源：Yahoo Finance（yfinance）。本工具为巴菲特式定量参考，不构成投资建议；公司护城河、管理层等定性因素需另行判断。")
+        st.caption("数据来源：Yahoo Finance（yfinance）。本工具为贤哥视角的定量参考，不构成投资建议；公司护城河、管理层等定性因素需另行判断。")
 
 
 with st.sidebar:

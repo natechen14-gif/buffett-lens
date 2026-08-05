@@ -13,7 +13,7 @@ def decide(quality, valuation):
                 "reason": "关键财务数据缺失，无法给出建仓判断。"}
     if quality["score"] < C.QUALITY_PASS_SCORE:
         return {"verdict": "不建议建仓", "level": "red",
-                "reason": f"质量平庸（{quality['score']:.0f}分），未达到巴菲特标准。"}
+                "reason": f"质量平庸（{quality['score']:.0f}分），未达到贤哥视角的质量标准。"}
 
     mos = (valuation.get("dcf") or {}).get("mos")
     val_score = valuation.get("score")
@@ -24,7 +24,7 @@ def decide(quality, valuation):
             return {"verdict": "可分批建仓", "level": "green",
                     "reason": "有充分安全边际，但股价处于10年高位，建议分批而非一次买入。"}
         return {"verdict": "建议建仓", "level": "green",
-                "reason": "质量达标且安全边际充分（≥25%），是巴菲特式的买入机会。"}
+                "reason": "质量达标且安全边际充分（≥25%），符合贤哥视角的建仓标准。"}
 
     if mos is not None and val_score is not None and mos >= C.MOF["partial"] and val_score >= C.VALUE_PARTIAL_SCORE:
         return {"verdict": "可分批/半仓建仓", "level": "yellow",

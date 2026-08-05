@@ -11,7 +11,7 @@ def is_financial(bundle):
 def validate(bundle):
     qt = bundle.get("quote_type")
     if qt and qt != "EQUITY":
-        return False, f"该代码类型为 {qt}，本工具仅适用于普通美股（如 AAPL）。"
+        return False, f"该代码类型为 {qt}，本工具仅适用于股票（如 AAPL / 600519 / 0700）。"
     close = bundle.get("close")
     has_price = bundle.get("current_price") is not None
     has_fin = any(bundle.get(k) for k in ("revenue", "net_income", "equity", "fcf"))
